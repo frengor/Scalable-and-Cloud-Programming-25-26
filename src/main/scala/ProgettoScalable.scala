@@ -16,9 +16,30 @@ object ProgettoScalable {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC")) // https://stackoverflow.com/a/52515612
 
         val filename = args(0)
-        val data = spark.read.option("header", value = true).schema("longitude DOUBLE, latitude DOUBLE, date TIMESTAMP").csv(filename).rdd
+        val rawData = spark.read
+            .option("header", value = true)
+            // java.lang.Double, java.lang.Double, java.sql.Timestamp
+            .schema("longitude DOUBLE, latitude DOUBLE, date TIMESTAMP")
+            .csv(filename)
+            .rdd
 
-        // java.lang.Double, java.lang.Double, java.sql.Timestamp
-        println(data.collect().toSeq.map(r => r.toSeq.map(e => e.getClass.getName)).head)
+        val data = rawData.map(r => (
+                r.getTimestamp(2)
+                    .toLocalDateTime
+                    .toLocalDate,
+                (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
+            ))
+            .distinct()
+
+        val first = data
+            .groupByKey()
+            .flatMap(_._2.toArray.combinations(2).map(a => (a(0), a(1))))
+            .filter(coords => coords._1 != coords._2)
+            .map((_, 1))
+            .reduceByKey(_ + _)
+            .sortBy(t => t._2, ascending = false)
+            .first()
+
+        println(first)
     }
 }
