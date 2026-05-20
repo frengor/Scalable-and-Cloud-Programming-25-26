@@ -42,8 +42,8 @@ object ProgettoScalable {
         val first = data
             .partitionBy(new RangePartitioner(partitions, data))
             .groupByKey()
-            .flatMap(
-                _._2.toArray
+            .flatMapValues[((Double, Double), (Double, Double))](
+                _.toArray
                     .combinations(2)
                     .filter {
                         case Array(c1, c2) => c1 != c2
@@ -56,7 +56,7 @@ object ProgettoScalable {
                         }
                     }
             )
-            .map((_, 1))
+            .map(t => (t._2, 1))
             .reduceByKey(_ + _)
             .sortBy(t => t._2, ascending = false)
             .first()
