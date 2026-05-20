@@ -1,9 +1,13 @@
+import org.apache.spark.RangePartitioner
 import org.apache.spark.sql.SparkSession
 
+import java.time.LocalDate
 import java.util.TimeZone
 import scala.Ordering.Implicits._
 
 object ProgettoScalable {
+    implicit val localDateOrdering: Ordering[LocalDate] = _ compareTo _ // https://stackoverflow.com/a/50395814
+
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
             System.err.println("Missing parameters: <inputFile> [partitions]")
@@ -32,6 +36,7 @@ object ProgettoScalable {
         ))
 
         val first = data
+            .partitionBy(new RangePartitioner(200, data))
             .groupByKey()
             .flatMap(
                 _._2.toArray
