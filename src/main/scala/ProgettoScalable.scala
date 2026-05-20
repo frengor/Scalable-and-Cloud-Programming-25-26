@@ -6,6 +6,8 @@ import java.util.TimeZone
 import scala.Ordering.Implicits._
 
 object ProgettoScalable {
+    private val defaultPartitions = 200
+
     implicit val localDateOrdering: Ordering[LocalDate] = _ compareTo _ // https://stackoverflow.com/a/50395814
 
     def main(args: Array[String]): Unit = {
@@ -21,6 +23,8 @@ object ProgettoScalable {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC")) // https://stackoverflow.com/a/52515612
 
         val filename = args(0)
+        val partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
+
         val rawData = spark.read
             .option("header", value = true)
             // java.lang.Double, java.lang.Double, java.sql.Timestamp
@@ -36,7 +40,7 @@ object ProgettoScalable {
         ))
 
         val first = data
-            .partitionBy(new RangePartitioner(200, data))
+            .partitionBy(new RangePartitioner(partitions, data))
             .groupByKey()
             .flatMap(
                 _._2.toArray
