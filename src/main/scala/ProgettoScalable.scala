@@ -1,6 +1,7 @@
 import org.apache.spark.sql.SparkSession
 
 import java.util.TimeZone
+import scala.Ordering.Implicits._
 
 object ProgettoScalable {
     def main(args: Array[String]): Unit = {
@@ -24,17 +25,28 @@ object ProgettoScalable {
             .rdd
 
         val data = rawData.map(r => (
-                r.getTimestamp(2)
-                    .toLocalDateTime
-                    .toLocalDate,
-                (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
-            ))
-            .distinct()
+            r.getTimestamp(2)
+                .toLocalDateTime
+                .toLocalDate,
+            (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
+        ))
 
         val first = data
             .groupByKey()
-            .flatMap(_._2.toArray.combinations(2).map(a => (a(0), a(1))))
-            .filter(coords => coords._1 != coords._2)
+            .flatMap(
+                _._2.toArray
+                    .combinations(2)
+                    .filter {
+                        case Array(c1, c2) => c1 != c2
+                    }
+                    .map {
+                        case Array(c1, c2) => if (c1 < c2) {
+                            (c1, c2)
+                        } else {
+                            (c2, c1)
+                        }
+                    }
+            )
             .map((_, 1))
             .reduceByKey(_ + _)
             .sortBy(t => t._2, ascending = false)
