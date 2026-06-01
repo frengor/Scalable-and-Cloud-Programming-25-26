@@ -39,28 +39,20 @@ object ProgettoScalable {
             (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
         ))
 
-        val first = data
+        val grouped = data
             .partitionBy(new RangePartitioner(partitions, data))
+            .distinct()
             .groupByKey()
-            .flatMapValues[((Double, Double), (Double, Double))](
-                _.toArray
-                    .combinations(2)
-                    .filter {
-                        case Array(c1, c2) => c1 != c2
-                    }
-                    .map {
-                        case Array(c1, c2) => if (c1 < c2) {
-                            (c1, c2)
-                        } else {
-                            (c2, c1)
-                        }
-                    }
-            )
+            .flatMapValues(identity)
+
+        grouped
+            .join(grouped)
+            .filter {
+                case (_, (c1, c2)) => c1 < c2
+            }
             .map(t => (t._2, 1))
             .reduceByKey(_ + _)
-            .sortBy(t => t._2, ascending = false)
-            .first()
-
-        println(first)
+            .top(1)(Ordering.by(_._2))
+            .foreach(println)
     }
 }
