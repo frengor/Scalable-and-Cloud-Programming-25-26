@@ -45,14 +45,27 @@ object ProgettoScalable {
             .groupByKey()
             .flatMapValues(identity)
 
-        grouped
+        val coords = grouped
             .join(grouped)
             .filter {
                 case (_, (c1, c2)) => c1 < c2
             }
             .map(t => (t._2, 1))
             .reduceByKey(_ + _)
-            .top(1)(Ordering.by(_._2))
-            .foreach(println)
+            .top(1)(Ordering.by(_._2))(0)._1
+
+        val dates = grouped
+            .mapValues(t => (t == coords._1, t == coords._2))
+            .filter(t => t._2._1 || t._2._2)
+            .reduceByKey {
+                case ((c1, c2), (c3, c4)) => (c1 || c3, c2 || c4)
+            }
+            .filter(_._2 == (true, true))
+            .sortByKey()
+            .map(_._1)
+            .collect()
+
+        println(coords)
+        dates foreach println
     }
 }
