@@ -43,19 +43,37 @@ object ProgettoScalable {
             .partitionBy(new RangePartitioner(partitions, data))
             .distinct()
             .groupByKey()
-            .flatMapValues(identity)
 
-        val (coords, amount) = grouped
-            .join(grouped)
-            .filter {
-                case (_, (c1, c2)) => c1 < c2
-            }
-            .map(t => (t._2, 1))
-            .reduceByKey(_ + _)
-            .top(1)(Ordering.by(_._2))(0)
+        val mapped = grouped.flatMap(t => {
+                val coords = t._2
+                for (w <- coords) yield {
+                    val map = collection.mutable.Map[(Double, Double), Int]()
+                    for {
+                        u <- coords
+                        if w < u
+                    } {
+                        map(u) = map.getOrElseUpdate(u, 0) + 1
+                    }
+                    (w, map)
+                }
+            })
+            .filter(_._2.nonEmpty)
+
+        val (coords1, (coords2, amount)) = mapped
+            .reduceByKey((map1, map2) => {
+                val (smaller, bigger) = if (map1.size <= map2.size) { (map1, map2) } else { (map2, map1) }
+                val map = bigger.clone()
+                for ((k, v) <- smaller) {
+                    map(k) = map.getOrElseUpdate(k, 0) + v
+                }
+                map
+            })
+            .mapValues(_.maxBy(_._2))
+            .top(1)(Ordering.by(_._2._2))(0)
 
         val dates = grouped
-            .mapValues(t => (t == coords._1, t == coords._2))
+            .flatMapValues(identity)
+            .mapValues(t => (t == coords1, t == coords2))
             .filter(t => t._2._1 || t._2._2)
             .reduceByKey {
                 case ((c1, c2), (c3, c4)) => (c1 || c3, c2 || c4)
@@ -67,7 +85,7 @@ object ProgettoScalable {
 
         assert(dates.length == amount, "Wrong amount of dates, expecting " + amount + " but got " + dates.length)
 
-        println(coords)
+        println((coords1, coords2))
         dates foreach println
     }
 }
