@@ -25,6 +25,8 @@ object ProgettoScalable {
         val filename = args(0)
         val partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
 
+        val start = System.currentTimeMillis()
+
         val rawData = spark.read
             .option("header", value = true)
             // java.lang.Double, java.lang.Double, java.sql.Timestamp
@@ -89,5 +91,8 @@ object ProgettoScalable {
 
         println((coords1, coords2))
         dates foreach println
+
+        val elapsed = System.currentTimeMillis() - start
+        println(s"Time: ${elapsed / 1000}s")
     }
 }
