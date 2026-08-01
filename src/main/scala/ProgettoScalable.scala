@@ -68,6 +68,7 @@ object ProgettoScalable {
         }
 
         val (coords1, (coords2, amount)) = mapped
+            // Using aggregateByKey instead of reduceByKey to avoid cloning the maps at each call
             .aggregateByKey(collection.mutable.Map[(Double, Double), Int]())(mapCombiner, mapCombiner)
             .mapValues(_.maxBy(_._2))
             .top(1)(Ordering.by(_._2._2))(0)
