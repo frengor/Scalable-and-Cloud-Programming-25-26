@@ -6,13 +6,13 @@ import java.util.TimeZone
 import scala.Ordering.Implicits._
 
 object ProgettoScalable {
-    private val defaultPartitions = 200
+    private val defaultPartitions = 8
 
     implicit val localDateOrdering: Ordering[LocalDate] = _ compareTo _ // https://stackoverflow.com/a/50395814
 
     def main(args: Array[String]): Unit = {
         if (args.length == 0) {
-            System.err.println("Missing parameters: <inputFile> [partitions]")
+            System.err.println("Missing parameters: <inputFile> [partitions] [workers]")
             return
         }
 
@@ -23,7 +23,13 @@ object ProgettoScalable {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC")) // https://stackoverflow.com/a/52515612
 
         val filename = args(0)
-        val partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
+
+        var partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
+        partitions = partitions * spark.sparkContext.defaultParallelism
+        if (args.length > 2) {
+            partitions = partitions * args(2).toInt
+        }
+        println(s"Running with ${partitions} partitions")
 
         val start = System.currentTimeMillis()
 
