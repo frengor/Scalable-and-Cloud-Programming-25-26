@@ -6,6 +6,9 @@ import java.util.TimeZone
 import scala.Ordering.Implicits._
 
 object ProgettoScalable {
+    /**
+     * Default value of partitions parameter.
+     */
     private val defaultPartitions = 8
 
     implicit val localDateOrdering: Ordering[LocalDate] = _ compareTo _ // https://stackoverflow.com/a/50395814
@@ -22,8 +25,8 @@ object ProgettoScalable {
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         TimeZone.setDefault(TimeZone.getTimeZone("UTC")) // https://stackoverflow.com/a/52515612
 
+        // Parse parameters
         val filename = args(0)
-
         var partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
         partitions = partitions * spark.sparkContext.defaultParallelism
         if (args.length > 2) {
@@ -47,18 +50,20 @@ object ProgettoScalable {
             (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
         ))
 
+        // Partition, remove duplicates and group by date
         val grouped = data
             .partitionBy(new RangePartitioner(partitions, data))
             .distinct()
             .groupByKey()
 
+        // Produce "stripes"
         val mapped = grouped.flatMap(t => {
                 val coords = t._2
                 for (w <- coords) yield {
                     val map = collection.mutable.Map[(Double, Double), Int]()
                     for {
                         u <- coords
-                        if w < u
+                        if w < u // Avoid counting coordinates twice
                     } {
                         map(u) = map.getOrElseUpdate(u, 0) + 1
                     }
@@ -75,12 +80,14 @@ object ProgettoScalable {
             map1
         }
 
+        // Find most co-occurring coordinates
         val (coords1, (coords2, amount)) = mapped
             // Using aggregateByKey instead of reduceByKey to avoid cloning the maps at each call
             .aggregateByKey(collection.mutable.Map[(Double, Double), Int]())(mapCombiner, mapCombiner)
             .mapValues(_.maxBy(_._2))
             .top(1)(Ordering.by(_._2._2))(0)
 
+        // Find dates with the most co-occurring coordinates
         val dates = grouped
             .flatMapValues(identity)
             .mapValues(t => (t == coords1, t == coords2))
