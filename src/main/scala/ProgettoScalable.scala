@@ -50,8 +50,6 @@ object ProgettoScalable {
         val grouped = data
             .partitionBy(new RangePartitioner(partitions, data))
             .distinct()
-            .groupByKey()
-            .flatMapValues(identity)
 
         val (coords, amount) = grouped
             .join(grouped)
