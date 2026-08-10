@@ -6,6 +6,9 @@ import java.util.TimeZone
 import scala.Ordering.Implicits._
 
 object ProgettoScalable {
+    /**
+     * Default value of partitions parameter.
+     */
     private val defaultPartitions = 8
 
     implicit val localDateOrdering: Ordering[LocalDate] = _ compareTo _ // https://stackoverflow.com/a/50395814
@@ -22,8 +25,8 @@ object ProgettoScalable {
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         TimeZone.setDefault(TimeZone.getTimeZone("UTC")) // https://stackoverflow.com/a/52515612
 
+        // Parse parameters
         val filename = args(0)
-
         var partitions = if (args.length < 2) { defaultPartitions } else { args(1).toInt }
         partitions = partitions * spark.sparkContext.defaultParallelism
         if (args.length > 2) {
@@ -47,19 +50,22 @@ object ProgettoScalable {
             (Math.round(r.getDouble(1) * 10.0) / 10.0, Math.round(r.getDouble(0) * 10.0) / 10.0)
         ))
 
+        // Partition and remove duplicates
         val grouped = data
             .partitionBy(new RangePartitioner(partitions, data))
             .distinct()
 
+        // Produce "pairs" and find the most co-occurring coordinates
         val (coords, amount) = grouped
             .join(grouped)
             .filter {
-                case (_, (c1, c2)) => c1 < c2
+                case (_, (c1, c2)) => c1 < c2 // Remove duplicated coordinate pairs
             }
             .map(t => (t._2, 1))
             .reduceByKey(_ + _)
             .top(1)(Ordering.by(_._2))(0)
 
+        // Find dates with the most co-occurring coordinates
         val dates = grouped
             .mapValues(t => (t == coords._1, t == coords._2))
             .filter(t => t._2._1 || t._2._2)
