@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.util.TimeZone
 import scala.Ordering.Implicits._
 
-object ProgettoScalable {
+object ScalableCourseProject {
     /**
      * Default value of partitions parameter.
      */
